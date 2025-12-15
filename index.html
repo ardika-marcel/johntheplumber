@@ -6,6 +6,7 @@
     <title>QuickFix Plumbing Services</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
+        /* --- CSS STYLES (Kept identical for consistency) --- */
         * {
             margin: 0;
             padding: 0;
@@ -145,6 +146,11 @@
             border-color: #667eea;
         }
 
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+
         .btn {
             background: #667eea;
             color: white;
@@ -164,12 +170,18 @@
 
         .btn-delete {
             background: #e74c3c;
+            padding: 12px 30px;
+            width: 100%; /* Full width for deletion button */
+        }
+
+        .btn-delete-admin {
+            background: #e74c3c;
             padding: 8px 15px;
             font-size: 14px;
             width: auto;
         }
 
-        .btn-delete:hover {
+        .btn-delete:hover, .btn-delete-admin:hover {
             background: #c0392b;
         }
 
@@ -183,7 +195,6 @@
             margin-bottom: 10px;
             border-radius: 5px;
             display: flex;
-            justify-content: space-between;
             align-items: center;
             border-left: 4px solid #667eea;
         }
@@ -257,6 +268,19 @@
             padding: 40px;
             font-style: italic;
         }
+
+        #delete-form-group {
+            margin-top: 30px;
+            padding: 20px;
+            border: 1px solid #e74c3c;
+            border-radius: 8px;
+            background-color: #fef0f0;
+        }
+        #delete-form-group h3 {
+            margin-bottom: 15px;
+            color: #e74c3c;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -290,25 +314,35 @@
         </div>
 
         <div class="panel" id="waitlist">
-            <h1>📋 Join Our Waiting List</h1>
-            <p style="text-align: center; color: #666; margin-bottom: 30px;">Add your name and phone number to reserve your spot for service. You will see your place in line below.</p>
+            <h1>📋 Join or Manage Your Spot</h1>
+            <p style="text-align: center; color: #666; margin-bottom: 30px;">Enter your details to reserve or remove your spot. Only one reservation is allowed per browser/device.</p>
 
             <div id="waitlist-message"></div>
 
-            <div class="form-group">
-                <label for="customer-name">Your Name:</label>
-                <input type="text" id="customer-name" placeholder="Enter your full name">
-            </div>
+            <div id="add-form-group">
+                <h3>Add New Reservation</h3>
+                <div class="form-group">
+                    <label for="customer-name">Your Name:</label>
+                    <input type="text" id="customer-name" placeholder="Enter your full name">
+                </div>
 
-            <div class="form-group">
-                <label for="customer-phone">Phone Number:</label>
-                <input type="tel" id="customer-phone" placeholder="Enter your phone number">
-            </div>
+                <div class="form-group">
+                    <label for="customer-phone">Phone Number:</label>
+                    <input type="tel" id="customer-phone" placeholder="Enter your phone number">
+                </div>
 
-            <button class="btn" onclick="addToWaitlist()">Add to Waiting List</button>
+                <button class="btn" id="add-btn" onclick="addToWaitlist()">Add to List</button>
+            </div>
+            
+            <div id="delete-form-group" style="display: none;">
+                <h3>Delete Your Active Reservation</h3>
+                <p style="text-align: center; margin-bottom: 15px; color: #721c24;">Click the button below to instantly remove the reservation you made from this device.</p>
+                
+                <button class="btn btn-delete" id="delete-btn" onclick="attemptDeleteFromWaitlist()">Delete My Entry</button>
+            </div>
 
             <div class="waitlist">
-                <h2>Current Waiting List (First In, First Out)</h2>
+                <h2>Current Waiting List (Read Only)</h2>
                 <div id="waitlist-display"></div>
             </div>
         </div>
@@ -348,9 +382,23 @@
         // Initialize the Supabase client
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         const WAITLIST_TABLE = 'waitlist';
+        const LOCAL_STORAGE_KEY = 'quickfix_reservation_id'; // Key for tracking reservation
 
         // Store admin state
         let isAdminLoggedIn = false;
+
+        // --- LOCAL STORAGE FUNCTIONS ---
+        function getReservationId() {
+            return localStorage.getItem(LOCAL_STORAGE_KEY);
+        }
+
+        function setReservationId(id) {
+            localStorage.setItem(LOCAL_STORAGE_KEY, id);
+        }
+
+        function clearReservationId() {
+            localStorage.removeItem(LOCAL_STORAGE_KEY);
+        }
 
         // Initialize display on load
         document.addEventListener('DOMContentLoaded', updateWaitlistDisplay);
@@ -367,84 +415,171 @@
             // Update displays
             if (panelName === 'waitlist') {
                 updateWaitlistDisplay();
+                updateWaitlistForms();
             } else if (panelName === 'admin') {
                 updateAdminDisplay();
             }
         }
+
+        /**
+         * Toggles visibility between the Add form and the Delete form based on 
+         * whether a reservation ID is present in local storage.
+         */
+        function updateWaitlistForms() {
+            const reservationId = getReservationId();
+            const addForm = document.getElementById('add-form-group');
+            const deleteForm = document.getElementById('delete-form-group');
+            const messageDiv = document.getElementById('waitlist-message');
+
+            if (reservationId) {
+                // Reservation exists in local storage: block addition, show deletion form
+                addForm.style.display = 'none';
+                deleteForm.style.display = 'block';
+                showMessage(messageDiv, 'You have an active reservation associated with this device. Click "Delete My Entry" to remove it.', 'error', 7000);
+            } else {
+                // No reservation found: allow adding, hide deletion form
+                addForm.style.display = 'block';
+                deleteForm.style.display = 'none';
+                showMessage(messageDiv, '', 'error'); // Clear potential error message
+            }
+        }
+
 
         async function addToWaitlist() {
             const name = document.getElementById('customer-name').value.trim();
             const phone = document.getElementById('customer-phone').value.trim();
             const messageDiv = document.getElementById('waitlist-message');
 
+            // 1. PRIMARY CHECK: Is there a reservation ID already stored locally?
+            if (getReservationId()) {
+                showMessage(messageDiv, 'You already have an active reservation. Please use the deletion button below to remove it before adding a new one.', 'error', 7000);
+                return;
+            }
+
             if (!name || !phone) {
                 showMessage(messageDiv, 'Please enter both name and phone number.', 'error');
                 return;
             }
 
-            // Check if name/phone combination already exists
-            const { data: existingEntry, error: checkError } = await supabase
+            // 2. Add to Supabase
+            const { data, error: insertError } = await supabase
                 .from(WAITLIST_TABLE)
-                .select('id')
-                .eq('name', name)
-                .eq('phone', phone)
-                .limit(1);
-
-            if (checkError) {
-                console.error('Check Error:', checkError);
-                showMessage(messageDiv, 'An error occurred while checking for existing entry. Please try again.', 'error');
-                return;
-            }
-
-            if (existingEntry.length > 0) {
-                showMessage(messageDiv, 'You already have an entry on the waiting list! Please delete your existing entry first before adding another reservation.', 'error');
-                return;
-            }
-
-            // Add to Supabase
-            const { error } = await supabase
-                .from(WAITLIST_TABLE)
-                .insert([{ name: name, phone: phone }]);
+                .insert([{ name: name, phone: phone }])
+                .select('id') // Request the ID back
+                .single();
             
-            if (error) {
-                console.error('Insert Error:', error);
-                showMessage(messageDiv, 'Failed to add to the waiting list: ' + error.message, 'error');
+            if (insertError) {
+                console.error('Insert Error:', insertError);
+                showMessage(messageDiv, 'Failed to add to the waiting list: ' + insertError.message, 'error');
                 return;
             }
 
-            // Clear inputs
+            // 3. Store the new reservation ID locally and update UI
+            const newId = data.id;
+            setReservationId(newId);
+            
+            const length = await getWaitlistLength();
+            showMessage(messageDiv, `SUCCESS! You have been added to the list and are spot #${length}.`, 'success');
+            
             document.getElementById('customer-name').value = '';
             document.getElementById('customer-phone').value = '';
 
-            showMessage(messageDiv, 'Successfully added to the waiting list!', 'success');
             updateWaitlistDisplay();
+            updateWaitlistForms();
         }
 
-        async function deleteFromWaitlist(id, entryName, isAdmin = false) {
-            const messageDiv = isAdmin ? document.getElementById('admin-message') : document.getElementById('waitlist-message');
+        async function attemptDeleteFromWaitlist() {
+            const messageDiv = document.getElementById('waitlist-message');
+            const reservationId = getReservationId(); // Get ID from browser's local storage
 
-            const { error } = await supabase
+            if (!reservationId) {
+                 showMessage(messageDiv, 'No active reservation found on this device to delete.', 'error');
+                 return;
+            }
+
+            // 1. Fetch the user's name (for the success message) before deleting
+            const { data: entryData, error: fetchError } = await supabase
+                .from(WAITLIST_TABLE)
+                .select('name')
+                .eq('id', reservationId)
+                .limit(1);
+
+            if (fetchError || entryData.length === 0) {
+                 // The ID exists locally but not in the DB (admin may have deleted it).
+                 clearReservationId();
+                 showMessage(messageDiv, 'Your reservation was not found on the list (it may have been removed by an admin). Local tracking cleared. You may now add a new entry.', 'success');
+                 updateWaitlistForms();
+                 updateWaitlistDisplay();
+                 return;
+            }
+
+            const entryName = entryData[0].name;
+
+            // 2. Perform the deletion using the unique ID
+            const { error: deleteError, count } = await supabase
                 .from(WAITLIST_TABLE)
                 .delete()
-                .eq('id', id);
+                .eq('id', reservationId)
+                .select('*', { count: 'exact' });
 
-            if (error) {
-                console.error('Delete Error:', error);
-                showMessage(messageDiv, 'Failed to remove entry: ' + error.message, 'error');
+            if (deleteError) {
+                console.error('Delete Error:', deleteError);
+                showMessage(messageDiv, 'Failed to remove entry: ' + deleteError.message, 'error');
                 return;
             }
 
-            if (!isAdmin) {
-                showMessage(messageDiv, `${entryName} has been removed from the waiting list. You can now add a new reservation.`, 'success');
+            if (count > 0) {
+                // 3. Clear local storage after successful deletion
+                clearReservationId();
+                
+                showMessage(messageDiv, `${entryName}'s reservation has been successfully removed. You can now add a new entry.`, 'success');
             } else {
-                showMessage(messageDiv, `${entryName} (ID: ${id}) has been removed by Admin.`, 'success');
+                showMessage(messageDiv, `Deletion failed. The entry may have already been removed by an administrator.`, 'error');
+            }
+            
+            updateWaitlistDisplay();
+            updateWaitlistForms();
+        }
+
+        async function deleteAdminEntry(id, entryName) {
+            const messageDiv = document.getElementById('admin-message');
+
+            // Admin deletion uses the ID.
+            const { error: deleteError, count } = await supabase
+                .from(WAITLIST_TABLE)
+                .delete()
+                .eq('id', id)
+                .select('*', { count: 'exact' });
+
+            if (deleteError) {
+                console.error('Delete Error:', deleteError);
+                showMessage(messageDiv, 'Failed to remove entry: ' + deleteError.message, 'error');
+                return;
             }
 
-            // Update both lists after deletion
-            updateWaitlistDisplay();
-            if (isAdmin) {
-                updateAdminWaitlistDisplay();
+            if (count > 0) {
+                 // If the admin deleted the reservation associated with the user's browser, clear local storage
+                if (getReservationId() == id) {
+                    clearReservationId();
+                    // Update user's forms if they are on the waitlist page
+                    updateWaitlistForms(); 
+                }
+
+                showMessage(messageDiv, `${entryName} (ID: ${id}) has been removed by Admin.`, 'success');
+            } else {
+                showMessage(messageDiv, `Admin deletion failed. Entry may not exist.`, 'error');
             }
+           
+            updateWaitlistDisplay();
+            updateAdminWaitlistDisplay();
+        }
+
+        async function getWaitlistLength() {
+            const { count, error } = await supabase
+                .from(WAITLIST_TABLE)
+                .select('*', { count: 'exact', head: true });
+
+            return count;
         }
 
         async function updateWaitlistDisplay() {
@@ -469,15 +604,27 @@
             }
 
             let html = '';
+            const currentReservationId = getReservationId();
+
             waitlist.forEach((entry, index) => {
+                // Obfuscating the display for privacy
+                const obfuscatedName = entry.name.length > 2 ? entry.name.charAt(0) + '***' + entry.name.slice(-1) : entry.name;
+                const isMyReservation = currentReservationId && currentReservationId == entry.id;
+                
+                // Obfuscate phone number for all public viewers
+                const phoneDisplay = entry.phone.length > 4 ? `📞 ***-***-${entry.phone.slice(-4)}` : entry.phone;
+                
+                // Highlight the user's spot if they have one active
+                const highlightStyle = isMyReservation ? 'border-left: 4px solid #e74c3c; background: #ffebeb;' : '';
+                const mySpotText = isMyReservation ? ' (YOUR SPOT)' : '';
+
                 html += `
-                    <div class="waitlist-item">
+                    <div class="waitlist-item" style="${highlightStyle}">
                         <div class="waitlist-item-position">${index + 1}</div>
                         <div class="waitlist-item-info">
-                            <div class="waitlist-item-name">${entry.name}</div>
-                            <div class="waitlist-item-phone">📞 ${entry.phone}</div>
+                            <div class="waitlist-item-name">${obfuscatedName}</div>
+                            <div class="waitlist-item-phone">${phoneDisplay}${mySpotText}</div>
                         </div>
-                        <button class="btn btn-delete" onclick="deleteFromWaitlist(${entry.id}, '${entry.name}', false)">Delete My Entry</button>
                     </div>
                 `;
             });
@@ -527,9 +674,9 @@
                         <div class="waitlist-item-position">${index + 1}</div>
                         <div class="waitlist-item-info">
                             <div class="waitlist-item-name">${entry.name}</div>
-                            <div class="waitlist-item-phone">📞 ${entry.phone}</div>
+                            <div class="waitlist-item-phone">📞 ${entry.phone} (ID: ${entry.id})</div>
                         </div>
-                        <button class="btn btn-delete" onclick="deleteFromWaitlist(${entry.id}, '${entry.name}', true)">Complete/Remove</button>
+                        <button class="btn btn-delete-admin" onclick="deleteAdminEntry(${entry.id}, '${entry.name}')">Complete/Remove</button>
                     </div>
                 `;
             });
@@ -552,7 +699,7 @@
             }
         }
 
-        function showMessage(element, message, type) {
+        function showMessage(element, message, type, duration = 5000) {
             if (!message) {
                 element.innerHTML = '';
                 return;
@@ -562,10 +709,10 @@
             
             setTimeout(() => {
                 element.innerHTML = '';
-            }, 4000);
+            }, duration);
         }
 
-        // Allow Enter key for PIN
+        // Event listener for PIN input and initial UI update
         document.addEventListener('DOMContentLoaded', function() {
             const pinInput = document.getElementById('admin-pin');
             if (pinInput) {
@@ -575,6 +722,8 @@
                     }
                 });
             }
+            // Initial call to set form states correctly
+            updateWaitlistForms();
         });
     </script>
 </body>
