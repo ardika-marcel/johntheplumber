@@ -560,6 +560,7 @@
 
             if (!reservationId) {
                  showMessage(messageDiv, 'No active reservation found on this device to delete.', 'error');
+                 updateWaitlistForms(); 
                  return;
             }
 
@@ -574,7 +575,7 @@
                  // The ID exists locally but not in the DB (admin may have deleted it).
                  clearReservationId();
                  showMessage(messageDiv, 'Your reservation was not found on the list (it may have been removed by an admin). Local tracking cleared. You may now add a new entry.', 'success');
-                 updateWaitlistForms();
+                 updateWaitlistForms(); 
                  updateWaitlistDisplay();
                  return;
             }
@@ -595,18 +596,15 @@
             }
 
             if (count > 0) {
-                // 3. Clear local storage after successful deletion
+                // 3. Clear local storage, update forms/display, then show success message.
                 clearReservationId();
+                updateWaitlistDisplay();
+                updateWaitlistForms(); 
                 
                 showMessage(messageDiv, `${entryName}'s reservation has been successfully removed. You can now add a new entry.`, 'success');
             } else {
                 showMessage(messageDiv, `Deletion failed. The entry may have already been removed by an administrator.`, 'error');
             }
-            
-            // --- FIX APPLIED HERE: Ensure UI state is updated immediately ---
-            updateWaitlistDisplay();
-            updateWaitlistForms(); 
-            // ---------------------------------------------------------------
         }
 
         async function deleteAdminEntry(id, entryName) {
