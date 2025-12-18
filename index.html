@@ -69,6 +69,11 @@
             background: #764ba2;
         }
 
+        .nav button.pressed {
+            background: #764ba2;
+            transform: translateY(-2px);
+        }
+
         .panel {
             display: none;
             background: white;
@@ -211,6 +216,11 @@
         }
 
         .btn:active {
+            background: #764ba2;
+            transform: translateY(-2px);
+        }
+
+        .btn.pressed {
             background: #764ba2;
             transform: translateY(-2px);
         }
@@ -531,6 +541,8 @@
 
         // Store admin state
         let isAdminLoggedIn = false;
+
+        document.addEventListener('touchstart', function () {}, { passive: true });
 
         // --- PIN FUNCTIONS (Database-backed) ---
         async function getAdminPin() {
@@ -950,9 +962,24 @@
             }
             // Initial call to set form states correctly
             updateWaitlistForms();
+            installPressFeedback();
         });
+
+        function installPressFeedback() {
+            const elements = document.querySelectorAll('.nav button, .btn');
+            elements.forEach((el) => {
+                const add = () => el.classList.add('pressed');
+                const remove = () => el.classList.remove('pressed');
+                el.addEventListener('touchstart', add, { passive: true });
+                el.addEventListener('touchend', remove);
+                el.addEventListener('touchcancel', remove);
+                el.addEventListener('mousedown', add);
+                el.addEventListener('mouseup', remove);
+                el.addEventListener('mouseleave', remove);
+                el.addEventListener('blur', remove);
+            });
+        }
     </script>
 </body>
 </html>
-
 
