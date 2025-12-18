@@ -63,15 +63,11 @@
         .nav button:active {
             background: #764ba2;
             transform: translateY(-2px);
+            transition: transform 0.05s; /* Instant feedback */
         }
 
         .nav button.active {
             background: #764ba2;
-        }
-
-        .nav button.pressed {
-            background: #764ba2;
-            transform: translateY(-2px);
         }
 
         .panel {
@@ -218,11 +214,7 @@
         .btn:active {
             background: #764ba2;
             transform: translateY(-2px);
-        }
-
-        .btn.pressed {
-            background: #764ba2;
-            transform: translateY(-2px);
+            transition: transform 0.05s;
         }
 
         .btn-delete {
@@ -528,6 +520,9 @@
 
     <script>
         // --- SUPABASE CONFIGURATION ---
+        // Enable CSS :active state on iOS/Mobile
+        document.addEventListener('touchstart', function() {}, {passive: true});
+
         const SUPABASE_URL = 'https://dcrbyuilbjupdgeecplk.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_52rT6qyN0PNVo4TVz6enNw_yXClXDkF';
         
@@ -962,24 +957,9 @@
             }
             // Initial call to set form states correctly
             updateWaitlistForms();
-            installPressFeedback();
         });
-
-        function installPressFeedback() {
-            const elements = document.querySelectorAll('.nav button, .btn');
-            elements.forEach((el) => {
-                const add = () => el.classList.add('pressed');
-                const remove = () => el.classList.remove('pressed');
-                el.addEventListener('touchstart', add, { passive: true });
-                el.addEventListener('touchend', remove);
-                el.addEventListener('touchcancel', remove);
-                el.addEventListener('mousedown', add);
-                el.addEventListener('mouseup', remove);
-                el.addEventListener('mouseleave', remove);
-                el.addEventListener('blur', remove);
-            });
-        }
     </script>
 </body>
 </html>
+
 
