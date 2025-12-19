@@ -324,9 +324,8 @@
     </style>
 </head>
 <body>
-<div class="container">
-
-    <div class="nav">
+    <div class="container">
+        <div class="nav">
         <button onclick="showPanel('home')" ontouchstart="showPanel('home')" class="active" id="nav-home">Home</button>
         <button onclick="showPanel('contact')" ontouchstart="showPanel('contact')" id="nav-contact">Contact</button>
         <button onclick="showPanel('testimonials')" ontouchstart="showPanel('testimonials')" id="nav-testimonials">Testimonials</button>
@@ -355,7 +354,7 @@
             </div>
 
             <h2>Our Services</h2>
-            <div class="image-gallery">
+            <div class="panel active" id="home">
                 <div class="image-box">
                     <img src="Boost.jpg" alt="Emergency Repairs">
                     <p>🚰 Emergency Repairs<br>Fast response to leaks and bursts</p>
@@ -561,7 +560,7 @@
 
             document.getElementById(panelName).classList.add('active');
             document.getElementById('nav-' + panelName).classList.add('active');
-}
+
 
             // Update displays
             if (panelName === 'waitlist') {
@@ -570,6 +569,7 @@
             } else if (panelName === 'admin') {
                 updateAdminDisplay();
             }
+        }
 
         /**
          * Toggles visibility between the Add form and the Delete form based on 
@@ -932,3 +932,4 @@
     </script>
 </body>
 </html>
+
